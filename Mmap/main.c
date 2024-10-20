@@ -20,11 +20,12 @@ double elapsed_time(struct timeval start, struct timeval end) {
     return (end.tv_sec - start.tv_sec) * 1e6 + (end.tv_usec - start.tv_usec);
 }
 
-void test_mmap_ipc(const char *type) {
+void test_mmap_ipc(const char *type, int mmap_flags) {
     struct timeval start, end;
     pid_t pid;
-    int fd;
+    int fd = -1;
     size_t i;
+    char *addr;
 
     char *buffer = malloc(BLOCK_SIZE);
     if (!buffer) {
@@ -32,24 +33,31 @@ void test_mmap_ipc(const char *type) {
         exit(EXIT_FAILURE);
     }
 
-    fd = open(FILE_PATH, O_RDWR | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0) {
-        perror("open failed");
-        free(buffer);
-        exit(EXIT_FAILURE);
+    if (!(mmap_flags & MAP_ANONYMOUS)) {
+        fd = open(FILE_PATH, O_RDWR | O_CREAT | O_TRUNC, 0666);
+        if (fd < 0) {
+            perror("open failed");
+            free(buffer);
+            exit(EXIT_FAILURE);
+        }
+
+        if (ftruncate(fd, SIZE) != 0) {
+            perror("ftruncate failed");
+            close(fd);
+            free(buffer);
+            exit(EXIT_FAILURE);
+        }
     }
 
-    if (ftruncate(fd, SIZE) != 0) {
-        perror("ftruncate failed");
-        close(fd);
-        free(buffer);
-        exit(EXIT_FAILURE);
-    }
-
-    char *addr = mmap(NULL, SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    addr = mmap(NULL, SIZE,
+                PROT_READ | PROT_WRITE,
+                mmap_flags,
+                (mmap_flags & MAP_ANONYMOUS) ? -1 : fd,
+                0);
+   
     if (addr == MAP_FAILED) {
         perror("mmap failed");
-        close(fd);
+        if (fd != -1) close(fd);
         free(buffer);
         exit(EXIT_FAILURE);
     }
@@ -60,7 +68,7 @@ void test_mmap_ipc(const char *type) {
     if (sem_write == SEM_FAILED || sem_read == SEM_FAILED) {
         perror("sem_open failed");
         munmap(addr, SIZE);
-        close(fd);
+        if (fd != -1) close(fd);
         free(buffer);
         exit(EXIT_FAILURE);
     }
@@ -69,29 +77,30 @@ void test_mmap_ipc(const char *type) {
     if (pid < 0) {
         perror("fork failed");
         munmap(addr, SIZE);
-        close(fd);
+        if (fd != -1) close(fd);
         free(buffer);
         exit(EXIT_FAILURE);
     }
 
     if (pid == 0) {
         gettimeofday(&start, NULL);
-        
+       
         for (i = 0; i < ITERATIONS; i++) {
             sem_wait(sem_read);
             memcpy(buffer, addr + (i % (SIZE - BLOCK_SIZE)), BLOCK_SIZE);
             sem_post(sem_write);
         }
-        
+       
         gettimeofday(&end, NULL);
 
         double elapsed = elapsed_time(start, end);
         double latency = elapsed / ITERATIONS;
         double throughput = ((double)(BLOCK_SIZE * ITERATIONS) / elapsed) * 1e6;
-        printf("mmap IPC Results: %d microseconds elapsed, Latency: %.2f microseconds, Throughput: %.2f MB/s\n",
-               (int)elapsed, latency, throughput / 1024 / 1024);
+        printf("%s mmap Results: %d microseconds elapsed, Latency: %.2f microseconds, Throughput: %.2f MB/s\n",
+               type, (int)elapsed, latency, throughput / 1024 / 1024);
+       
         munmap(addr, SIZE);
-        close(fd);
+        if (fd != -1) close(fd);
         exit(0);
     } else {
         for (i = 0; i < ITERATIONS; i++) {
@@ -102,11 +111,10 @@ void test_mmap_ipc(const char *type) {
             memcpy(addr + (i % (SIZE - BLOCK_SIZE)), buffer, BLOCK_SIZE);
             sem_post(sem_read);
         }
-
     }
 
     munmap(addr, SIZE);
-    close(fd);
+    if (fd != -1) close(fd);
     free(buffer);
     sem_close(sem_write);
     sem_close(sem_read);
@@ -114,8 +122,21 @@ void test_mmap_ipc(const char *type) {
     sem_unlink(SEM_NAME_READ);
 }
 
+void test_mmap_modes() {
+    printf("\nTesting different mmap modes:\n");
+    printf("-----------------------------\n");
+   
+    test_mmap_ipc("MAP_SHARED", MAP_SHARED);
+    sleep(1); // Пауза між тестами
+   
+    test_mmap_ipc("MAP_PRIVATE", MAP_PRIVATE);
+    sleep(1);
+
+    test_mmap_ipc("MAP_ANONYMOUS", MAP_SHARED | MAP_ANONYMOUS);
+}
+
 int main(void) {
-    test_mmap_ipc("mmap-based IPC");
+    test_mmap_modes();
     unlink(FILE_PATH);
     return 0;
 }
