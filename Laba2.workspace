@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeLite_Workspace Name="Laba2" Database="" Version="10.0.0">
+  <Project Name="File" Path="File/File.project" Active="Yes"/>
+  <Project Name="Mmap" Path="Mmap/Mmap.project"/>
+  <Project Name="Queues" Path="Queues/Queues.project"/>
+  <Project Name="SharedMemory" Path="SharedMemory/SharedMemory.project"/>
+  <Project Name="Socket" Path="Socket/Socket.project"/>
+  <BuildMatrix>
+    <WorkspaceConfiguration Name="Debug" Selected="yes">
+      <Environment/>
+      <Project Name="File" ConfigName="Debug"/>
+      <Project Name="Mmap" ConfigName="Debug"/>
+      <Project Name="Queues" ConfigName="Debug"/>
+      <Project Name="SharedMemory" ConfigName="Debug"/>
+      <Project Name="Socket" ConfigName="Debug"/>
+    </WorkspaceConfiguration>
+    <WorkspaceConfiguration Name="Release" Selected="yes">
+      <Environment/>
+      <Project Name="File" ConfigName="Release"/>
+      <Project Name="Mmap" ConfigName="Release"/>
+      <Project Name="Queues" ConfigName="Release"/>
+      <Project Name="SharedMemory" ConfigName="Release"/>
+      <Project Name="Socket" ConfigName="Release"/>
+    </WorkspaceConfiguration>
+  </BuildMatrix>
+</CodeLite_Workspace>
